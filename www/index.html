@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Finanzas</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/dist/date-fns.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+        :root {
+            --bg-main: #f4f7fa;
+            --bg-card: #ffffff;
+            --text-primary: #1c294c;
+            --text-secondary: #5a647e;
+            --primary-blue: #0052ff;
+            --accent-green: #00c853;
+            --border-color: #dee2e6;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 20px;
+        }
+
+        #login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        .login-box {
+            background-color: var(--bg-card);
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: 300px;
+        }
+
+        .login-box h1 {
+            margin-bottom: 20px;
+            color: var(--primary-blue);
+        }
+
+        .login-box input {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+        }
+
+        .login-box button {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            background-color: var(--primary-blue);
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .login-box button:hover {
+            background-color: #0048e0;
+        }
+        
+        #error-message {
+            color: #d9534f;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .dashboard-title {
+            font-size: 2.5em;
+            color: var(--text-primary);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .filter-container {
+            background-color: var(--bg-card);
+            padding: 15px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .filter-container button, .filter-container input {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background-color: #fff;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .filter-container button:hover {
+            background-color: #f0f2f5;
+            border-color: #b4bdce;
+        }
+        
+        .filter-container button.active {
+            background-color: var(--primary-blue);
+            color: #fff;
+            border-color: var(--primary-blue);
+        }
+        
+        .filter-container label {
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background-color: var(--bg-card);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        .card h2 {
+            margin-top: 0;
+            font-size: 1.5em;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .stat {
+            background-color: var(--bg-main);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: 700;
+            color: var(--primary-blue);
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div id="login-overlay">
+        <div class="login-box">
+            <h1>Iniciar Sesión</h1>
+            <input type="text" id="username" placeholder="Usuario" required>
+            <input type="password" id="password" placeholder="Contraseña" required>
+            <button onclick="login()">Entrar</button>
+            <p id="error-message">Usuario o contraseña incorrectos.</p>
+        </div>
+    </div>
+
+    <div id="dashboard-container" class="main-container">
+        <h1 class="dashboard-title">Dashboard de Finanzas</h1>
+
+        <div class="filter-container">
+            <button id="today-btn">Hoy</button>
+            <button id="weekly-btn" class="active">Semanal</button>
+            <button id="monthly-btn">Mensual</button>
+            <div class="date-range">
+                <label for="start-date">Desde:</label>
+                <input type="date" id="start-date">
+                <label for="end-date">Hasta:</label>
+                <input type="date" id="end-date">
+                <button id="apply-range-btn">Aplicar</button>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="card">
+                <h2>Resumen General</h2>
+                <div class="stats-grid">
+                    <div class="stat">
+                        <div id="total-ingresos" class="stat-value">0</div>
+                        <div class="stat-label">Ingresos Totales</div>
+                    </div>
+                    <div class="stat">
+                        <div id="total-propina" class="stat-value">0</div>
+                        <div class="stat-label">Propina Total</div>
+                    </div>
+                    <div class="stat">
+                        <div id="total-viajes" class="stat-value">0</div>
+                        <div class="stat-label">Viajes Totales</div>
+                    </div>
+                    <div class="stat">
+                        <div id="avg-ingresos" class="stat-value">0</div>
+                        <div class="stat-label">Ingreso Promedio</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <h2>Distribución de Ingresos</h2>
+                <div class="chart-container" style="max-height: 300px; display: flex; justify-content: center; align-items: center;">
+                    <canvas id="distribucionIngresosChart"></canvas>
+                </div>
+            </div>
+            <div class="card" style="grid-column: 1 / -1;">
+                <h2>Ingresos por Día</h2>
+                <div class="chart-container">
+                    <canvas id="ingresosDiariosChart"></canvas>
+                </div>
+            </div>
+            <div class="card" style="grid-column: 1 / -1;">
+                <h2>Viajes por Día</h2>
+                <div class="chart-container">
+                    <canvas id="viajesChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const rawData = {
+          "2025-06-07": {"salario": 780, "propina": 116, "viajes": 14}, "2025-06-08": {"salario": 770, "propina": 147, "viajes": 15},
+          "2025-06-09": {"salario": 0, "propina": 0, "viajes": 0}, "2025-06-10": {"salario": 810, "propina": 82, "viajes": 15},
+          "2025-06-11": {"salario": 790, "propina": 69, "viajes": 15}, "2025-06-12": {"salario": 820, "propina": 65, "viajes": 16},
+          "2025-06-13": {"salario": 810, "propina": 10, "viajes": 15}, "2025-06-14": {"salario": 750, "propina": 80, "viajes": 13},
+          "2025-06-15": {"salario": 540, "propina": 60, "viajes": 10}, "2025-06-16": {"salario": 0, "propina": 0, "viajes": 0},
+          "2025-06-17": {"salario": 720, "propina": 100, "viajes": 12}, "2025-06-18": {"salario": 700, "propina": 156, "viajes": 13},
+          "2025-06-19": {"salario": 610, "propina": 55, "viajes": 11}, "2025-06-20": {"salario": 720, "propina": 138, "viajes": 14},
+          "2025-06-21": {"salario": 225, "propina": 85, "viajes": 4}, "2025-06-22": {"salario": 270, "propina": 80, "viajes": 5},
+          "2025-06-23": {"salario": 330, "propina": 18, "viajes": 7}, "2025-06-24": {"salario": 0, "propina": 0, "viajes": 0},
+          "2025-06-25": {"salario": 310, "propina": 133, "viajes": 6}, "2025-06-26": {"salario": 320, "propina": 2, "viajes": 5},
+          "2025-06-27": {"salario": 420, "propina": 150, "viajes": 8}, "2025-06-28": {"salario": 280, "propina": 91, "viajes": 6},
+          "2025-06-29": {"salario": 435, "propina": 25, "viajes": 7}, "2025-06-30": {"salario": 0, "propina": 0, "viajes": 0}
+        };
+
+        let ingresosChart, distribucionChart, viajesChart;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initCharts();
+            setActiveFilter('weekly'); 
+
+            document.getElementById('today-btn').addEventListener('click', () => setActiveFilter('today'));
+            document.getElementById('weekly-btn').addEventListener('click', () => setActiveFilter('weekly'));
+            document.getElementById('monthly-btn').addEventListener('click', () => setActiveFilter('monthly'));
+            document.getElementById('apply-range-btn').addEventListener('click', () => {
+                const start = document.getElementById('start-date').value;
+                const end = document.getElementById('end-date').value;
+                if(start && end) setActiveFilter('range', start, end);
+            });
+        });
+
+        function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            if (username === 'Airam' && password === '5202') {
+                document.getElementById('login-overlay').style.display = 'none';
+            } else {
+                document.getElementById('error-message').style.display = 'block';
+            }
+        }
+        
+        function setActiveFilter(filter, start, end) {
+            ['today-btn', 'weekly-btn', 'monthly-btn'].forEach(id => {
+                document.getElementById(id).classList.remove('active');
+            });
+             if(document.getElementById(filter + '-btn')) {
+                document.getElementById(filter + '-btn').classList.add('active');
+            }
+            updateDashboard(filter, start, end);
+        }
+
+        function filterData(filter, start, end) {
+            let startDate, endDate;
+            const today = new Date();
+
+            if (filter === 'today') {
+                startDate = dateFns.startOfToday();
+                endDate = dateFns.endOfToday();
+            } else if (filter === 'weekly') {
+                startDate = dateFns.startOfWeek(today, { weekStartsOn: 1 });
+                endDate = dateFns.endOfWeek(today, { weekStartsOn: 1 });
+            } else if (filter === 'monthly') {
+                startDate = dateFns.startOfMonth(today);
+                endDate = dateFns.endOfMonth(today);
+            } else if (filter === 'range' && start && end) {
+                startDate = dateFns.parse(start, 'yyyy-MM-dd', new Date());
+                endDate = dateFns.parse(end, 'yyyy-MM-dd', new Date());
+            } else { // Default case
+                return {};
+            }
+
+            const filtered = {};
+            for (const dateStr in rawData) {
+                const date = dateFns.parse(dateStr, 'yyyy-MM-dd', new Date());
+                const dayOfWeek = dateFns.getDay(date); 
+                
+                if (dayOfWeek === 1 && rawData[dateStr].salario === 0) {
+                    continue;
+                }
+
+                if (date >= startDate && date <= endDate) {
+                    filtered[dateStr] = rawData[dateStr];
+                }
+            }
+            return filtered;
+        }
+
+        function updateDashboard(filter, start, end) {
+            const data = filterData(filter, start, end);
+            const labels = Object.keys(data).sort((a, b) => new Date(a) - new Date(b));
+            const salarioData = labels.map(date => data[date].salario);
+            const propinaData = labels.map(date => data[date].propina);
+            const viajesData = labels.map(date => data[date].viajes);
+
+            const totalSalario = salarioData.reduce((a, b) => a + b, 0);
+            const totalPropina = propinaData.reduce((a, b) => a + b, 0);
+            const totalIngresos = totalSalario + totalPropina;
+            const totalViajes = viajesData.reduce((a, b) => a + b, 0);
+            const workingDays = labels.filter(date => data[date].salario > 0).length;
+            const avgIngresos = totalIngresos / workingDays || 0;
+
+            document.getElementById('total-ingresos').innerText = `$${totalIngresos.toLocaleString()}`;
+            document.getElementById('total-propina').innerText = `$${totalPropina.toLocaleString()}`;
+            document.getElementById('total-viajes').innerText = totalViajes;
+            document.getElementById('avg-ingresos').innerText = `$${avgIngresos.toFixed(2)}`;
+
+            ingresosChart.data.labels = labels;
+            ingresosChart.data.datasets[0].data = salarioData;
+            ingresosChart.data.datasets[1].data = propinaData;
+            ingresosChart.update();
+
+            distribucionChart.data.datasets[0].data = [totalSalario, totalPropina];
+            distribucionChart.update();
+
+            viajesChart.data.labels = labels;
+            viajesChart.data.datasets[0].data = viajesData;
+            viajesChart.update();
+        }
+
+        function initCharts() {
+            const chartOptions = (extraOptions = {}) => ({
+                maintainAspectRatio: false,
+                responsive: true,
+                plugins: { legend: { labels: { color: 'var(--text-secondary)' } } },
+                scales: {
+                    x: { ticks: { color: 'var(--text-secondary)' }, grid: { color: 'var(--border-color)' } },
+                    y: { ticks: { color: 'var(--text-secondary)' }, grid: { color: 'var(--border-color)' } }
+                },
+                ...extraOptions
+            });
+
+            ingresosChart = new Chart(document.getElementById('ingresosDiariosChart'), {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'Salario', data: [], backgroundColor: 'rgba(0, 82, 255, 0.7)' },
+                        { label: 'Propina', data: [], backgroundColor: 'rgba(0, 200, 83, 0.7)' }
+                    ]
+                },
+                options: chartOptions({ scales: { x: { stacked: true }, y: { stacked: true } } })
+            });
+
+            distribucionChart = new Chart(document.getElementById('distribucionIngresosChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Salario', 'Propina'],
+                    datasets: [{ data: [0, 0], backgroundColor: ['#0052ff', '#00c853'], hoverOffset: 4, borderColor: 'var(--bg-card)' }]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    responsive: true,
+                    plugins: { legend: { position: 'top', labels: { color: 'var(--text-primary)' } } }
+                }
+            });
+
+            viajesChart = new Chart(document.getElementById('viajesChart'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Viajes',
+                        data: [],
+                        borderColor: 'var(--primary-blue)',
+                        backgroundColor: 'rgba(0, 82, 255, 0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: chartOptions()
+            });
+        }
+    </script>
+</body>
+</html>
